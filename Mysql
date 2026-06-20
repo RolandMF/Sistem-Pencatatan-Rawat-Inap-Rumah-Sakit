@@ -1,6 +1,6 @@
 -- ============================================================
 --  SISTEM MANAJEMEN RUMAH SAKIT
---  MySQL Script Lengkap (Terbarui - Tanpa Perhitungan Hari)
+
 -- ============================================================
 
 
@@ -15,30 +15,33 @@ USE rumah_sakit2;
 CREATE TABLE dokter (
     id_dokter       VARCHAR(10)   PRIMARY KEY,
     nama_dokter     VARCHAR(100)  NOT NULL,
-    umur            INT           CHECK (umur > 0),
+    umur            INT,
     jenis_kelamin   VARCHAR(10),
     no_telepon      VARCHAR(15),
-    spesialisasi    VARCHAR(100)
+    spesialisasi    VARCHAR(100),
+    CONSTRAINT chk_dokter_umur CHECK (umur > 0)
 );
 
 -- 2. Tabel PASIEN
 CREATE TABLE pasien (
     id_pasien       VARCHAR(10)   PRIMARY KEY,
     nama_pasien     VARCHAR(100)  NOT NULL,
-    umur            INT           CHECK (umur > 0),
+    umur            INT,
     jenis_kelamin   VARCHAR(10),
     no_telepon      VARCHAR(15),
-    alamat          TEXT
+    alamat          TEXT,
+    CONSTRAINT chk_pasien_umur CHECK (umur > 0)
 );
 
 -- 3. Tabel PERAWAT
 CREATE TABLE perawat (
     id_perawat      VARCHAR(10)   PRIMARY KEY,
     nama_perawat    VARCHAR(100)  NOT NULL,
-    umur            INT           CHECK (umur > 0),
+    umur            INT,
     jenis_kelamin   VARCHAR(10),
     no_telepon      VARCHAR(15),
-    shift           VARCHAR(20)
+    shift           VARCHAR(20),
+    CONSTRAINT chk_perawat_umur CHECK (umur > 0)
 );
 
 -- 4. Tabel KAMAR
@@ -46,17 +49,20 @@ CREATE TABLE kamar (
     id_kamar        VARCHAR(10)   PRIMARY KEY,
     nomor_kamar     VARCHAR(10)   NOT NULL UNIQUE,
     kelas           VARCHAR(20),
-    jumlah_bed      INT           CHECK (jumlah_bed > 0),
-    harga_per_hari  DECIMAL(12,2) CHECK (harga_per_hari >= 0),
-    status          VARCHAR(20)   DEFAULT 'Kosong'
+    jumlah_bed      INT,
+    harga_per_hari  DECIMAL(12,2),
+    status          VARCHAR(20)   DEFAULT 'Kosong',
+    CONSTRAINT chk_kamar_bed CHECK (jumlah_bed > 0),
+    CONSTRAINT chk_kamar_harga CHECK (harga_per_hari >= 0)
 );
 
 -- 5. Tabel APOTEKER
 CREATE TABLE apoteker (
     id_apoteker     VARCHAR(10)   PRIMARY KEY,
     nama_apoteker   VARCHAR(100)  NOT NULL,
-    umur            INT           CHECK (umur > 0),
-    jenis_kelamin   VARCHAR(10)
+    umur            INT,
+    jenis_kelamin   VARCHAR(10),
+    CONSTRAINT chk_apoteker_umur CHECK (umur > 0)
 );
 
 -- 6. Tabel OBAT
@@ -64,8 +70,10 @@ CREATE TABLE obat (
     id_obat         VARCHAR(10)   PRIMARY KEY,
     nama_obat       VARCHAR(100)  NOT NULL,
     satuan          VARCHAR(20),
-    stok            INT           DEFAULT 0 CHECK (stok >= 0),
-    harga           DECIMAL(12,2) CHECK (harga >= 0)
+    stok            INT           DEFAULT 0,
+    harga           DECIMAL(12,2),
+    CONSTRAINT chk_obat_stok CHECK (stok >= 0),
+    CONSTRAINT chk_obat_harga CHECK (harga >= 0)
 );
 
 -- 7. Tabel RAWAT_INAP
@@ -78,19 +86,19 @@ CREATE TABLE rawat_inap (
     tanggal_keluar  DATE,
     diagnosis       TEXT,
     status          VARCHAR(20)   DEFAULT 'Aktif',
-    FOREIGN KEY (id_pasien)  REFERENCES pasien(id_pasien),
-    FOREIGN KEY (id_dokter)  REFERENCES dokter(id_dokter),
-    FOREIGN KEY (id_kamar)   REFERENCES kamar(id_kamar),
-    CHECK (tanggal_keluar IS NULL OR tanggal_keluar >= tanggal_masuk)
+    CONSTRAINT fk_rawatinap_pasien FOREIGN KEY (id_pasien) REFERENCES pasien(id_pasien),
+    CONSTRAINT fk_rawatinap_dokter FOREIGN KEY (id_dokter) REFERENCES dokter(id_dokter),
+    CONSTRAINT fk_rawatinap_kamar  FOREIGN KEY (id_kamar)  REFERENCES kamar(id_kamar),
+    CONSTRAINT chk_rawatinap_tanggal CHECK (tanggal_keluar IS NULL OR tanggal_keluar >= tanggal_masuk)
 );
 
--- 8. Tabel PERAWAT_RAWAT_INAP  (Bridge: merawat N:N)
+-- 8. Tabel PERAWAT_RAWAT_INAP (Bridge: merawat N:N)
 CREATE TABLE perawat_rawat_inap (
     id_perawat      VARCHAR(10)   NOT NULL,
     id_rawat_inap   VARCHAR(10)   NOT NULL,
     PRIMARY KEY (id_perawat, id_rawat_inap),
-    FOREIGN KEY (id_perawat)    REFERENCES perawat(id_perawat),
-    FOREIGN KEY (id_rawat_inap) REFERENCES rawat_inap(id_rawat_inap)
+    CONSTRAINT fk_prri_perawat    FOREIGN KEY (id_perawat)    REFERENCES perawat(id_perawat),
+    CONSTRAINT fk_prri_rawatinap  FOREIGN KEY (id_rawat_inap) REFERENCES rawat_inap(id_rawat_inap)
 );
 
 -- 9. Tabel RESEP_OBAT
@@ -101,19 +109,20 @@ CREATE TABLE resep_obat (
     id_rawat_inap   VARCHAR(10)   NOT NULL,
     tanggal_resep   DATE          NOT NULL,
     keterangan      TEXT,
-    FOREIGN KEY (id_dokter)     REFERENCES dokter(id_dokter),
-    FOREIGN KEY (id_apoteker)    REFERENCES apoteker(id_apoteker),
-    FOREIGN KEY (id_rawat_inap) REFERENCES rawat_inap(id_rawat_inap)
+    CONSTRAINT fk_resepobat_dokter   FOREIGN KEY (id_dokter)     REFERENCES dokter(id_dokter),
+    CONSTRAINT fk_resepobat_apoteker FOREIGN KEY (id_apoteker)   REFERENCES apoteker(id_apoteker),
+    CONSTRAINT fk_resepobat_rawatinap FOREIGN KEY (id_rawat_inap) REFERENCES rawat_inap(id_rawat_inap)
 );
 
--- 10. Tabel DETAIL_RESEP_OBAT  (Bridge: terdiri N:N)
+-- 10. Tabel DETAIL_RESEP_OBAT (Bridge: terdiri N:N)
 CREATE TABLE detail_resep_obat (
     id_resep   VARCHAR(10) NOT NULL,
     id_obat    VARCHAR(10) NOT NULL,
-    jumlah     INT         NOT NULL CHECK (jumlah > 0),
+    jumlah     INT         NOT NULL,
     PRIMARY KEY (id_resep, id_obat),
-    FOREIGN KEY (id_resep) REFERENCES resep_obat(id_resep),
-    FOREIGN KEY (id_obat)  REFERENCES obat(id_obat)
+    CONSTRAINT fk_detailresep_resep FOREIGN KEY (id_resep) REFERENCES resep_obat(id_resep),
+    CONSTRAINT fk_detailresep_obat  FOREIGN KEY (id_obat)  REFERENCES obat(id_obat),
+    CONSTRAINT chk_detailresep_jumlah CHECK (jumlah > 0)
 );
 
 
