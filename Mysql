@@ -1,147 +1,192 @@
 -- ============================================================
---  SISTEM PENCATATAN RAWAT INAP RUMAH SAKIT
---  Mata Kuliah  : Desain Basis Data
---  Nama Kelompok         : Steven Theodore Alden ( 2572015 ) - Roland Michael Febrian ( 2572017 ) - Adrian El Mahalli ( 2572053 ) 
-
+--  SISTEM MANAJEMEN RUMAH SAKIT
+--  MySQL Script Lengkap (Terbarui - Tanpa Perhitungan Hari)
 -- ============================================================
-
--- ─────────────────────────────────────────────
---  DATABASE
--- ─────────────────────────────────────────────
-CREATE DATABASE IF NOT EXISTS db_rawat_inap;
-USE db_rawat_inap;
 
 
 -- ============================================================
---  DDL — CREATE TABLE
+-- [1] BUAT DATABASE & TABEL
 -- ============================================================
 
--- 1. Tabel PASIEN
-CREATE TABLE pasien (
-    id_pasien       INT             AUTO_INCREMENT PRIMARY KEY,
-    no_rm           VARCHAR(10)     NOT NULL UNIQUE,           -- Nomor Rekam Medis
-    nama_pasien     VARCHAR(100)    NOT NULL,
-    tanggal_lahir   DATE            NOT NULL,
-    jenis_kelamin   ENUM('L','P')   NOT NULL,
-    alamat          TEXT,
-    no_telepon      VARCHAR(15)
-);
+CREATE DATABASE IF NOT EXISTS rumah_sakit2;
+USE rumah_sakit2;
 
--- 2. Tabel DOKTER
+-- 1. Tabel DOKTER
 CREATE TABLE dokter (
-    id_dokter       INT             AUTO_INCREMENT PRIMARY KEY,
-    nama_dokter     VARCHAR(100)    NOT NULL,
-    spesialisasi    VARCHAR(50)     NOT NULL,
-    no_telepon      VARCHAR(15)
+    id_dokter       VARCHAR(10)   PRIMARY KEY,
+    nama_dokter     VARCHAR(100)  NOT NULL,
+    umur            INT           CHECK (umur > 0),
+    jenis_kelamin   VARCHAR(10),
+    no_telepon      VARCHAR(15),
+    spesialisasi    VARCHAR(100)
 );
 
--- 3. Tabel KAMAR
+-- 2. Tabel PASIEN
+CREATE TABLE pasien (
+    id_pasien       VARCHAR(10)   PRIMARY KEY,
+    nama_pasien     VARCHAR(100)  NOT NULL,
+    umur            INT           CHECK (umur > 0),
+    jenis_kelamin   VARCHAR(10),
+    no_telepon      VARCHAR(15),
+    alamat          TEXT
+);
+
+-- 3. Tabel PERAWAT
+CREATE TABLE perawat (
+    id_perawat      VARCHAR(10)   PRIMARY KEY,
+    nama_perawat    VARCHAR(100)  NOT NULL,
+    umur            INT           CHECK (umur > 0),
+    jenis_kelamin   VARCHAR(10),
+    no_telepon      VARCHAR(15),
+    shift           VARCHAR(20)
+);
+
+-- 4. Tabel KAMAR
 CREATE TABLE kamar (
-    id_kamar        INT                         AUTO_INCREMENT PRIMARY KEY,
-    nomor_kamar     VARCHAR(10)                 NOT NULL UNIQUE,
-    kelas           ENUM('VIP','I','II','III')   NOT NULL,
-    harga_per_hari  DECIMAL(10,2)               NOT NULL,
-    status          ENUM('Tersedia','Terisi')    NOT NULL DEFAULT 'Tersedia'
+    id_kamar        VARCHAR(10)   PRIMARY KEY,
+    nomor_kamar     VARCHAR(10)   NOT NULL UNIQUE,
+    kelas           VARCHAR(20),
+    jumlah_bed      INT           CHECK (jumlah_bed > 0),
+    harga_per_hari  DECIMAL(12,2) CHECK (harga_per_hari >= 0),
+    status          VARCHAR(20)   DEFAULT 'Kosong'
 );
 
--- 4. Tabel RAWAT_INAP  (tabel utama — penghubung pasien, dokter, kamar)
+-- 5. Tabel APOTEKER
+CREATE TABLE apoteker (
+    id_apoteker     VARCHAR(10)   PRIMARY KEY,
+    nama_apoteker   VARCHAR(100)  NOT NULL,
+    umur            INT           CHECK (umur > 0),
+    jenis_kelamin   VARCHAR(10)
+);
+
+-- 6. Tabel OBAT
+CREATE TABLE obat (
+    id_obat         VARCHAR(10)   PRIMARY KEY,
+    nama_obat       VARCHAR(100)  NOT NULL,
+    satuan          VARCHAR(20),
+    stok            INT           DEFAULT 0 CHECK (stok >= 0),
+    harga           DECIMAL(12,2) CHECK (harga >= 0)
+);
+
+-- 7. Tabel RAWAT_INAP
 CREATE TABLE rawat_inap (
-    id_rawat_inap   INT             AUTO_INCREMENT PRIMARY KEY,
-    id_pasien       INT             NOT NULL,
-    id_dokter       INT             NOT NULL,
-    id_kamar        INT             NOT NULL,
-    tanggal_masuk   DATE            NOT NULL,
-    tanggal_keluar  DATE,                                      -- NULL = masih dirawat
-    diagnosis       VARCHAR(255),
-    status          ENUM('Aktif','Selesai') NOT NULL DEFAULT 'Aktif',
+    id_rawat_inap   VARCHAR(10)   PRIMARY KEY,
+    id_pasien       VARCHAR(10)   NOT NULL,
+    id_dokter       VARCHAR(10)   NOT NULL,
+    id_kamar        VARCHAR(10)   NOT NULL,
+    tanggal_masuk   DATE          NOT NULL,
+    tanggal_keluar  DATE,
+    diagnosis       TEXT,
+    status          VARCHAR(20)   DEFAULT 'Aktif',
     FOREIGN KEY (id_pasien)  REFERENCES pasien(id_pasien),
     FOREIGN KEY (id_dokter)  REFERENCES dokter(id_dokter),
-    FOREIGN KEY (id_kamar)   REFERENCES kamar(id_kamar)
+    FOREIGN KEY (id_kamar)   REFERENCES kamar(id_kamar),
+    CHECK (tanggal_keluar IS NULL OR tanggal_keluar >= tanggal_masuk)
 );
 
--- 5. Tabel OBAT
-CREATE TABLE obat (
-    id_obat         INT             AUTO_INCREMENT PRIMARY KEY,
-    nama_obat       VARCHAR(100)    NOT NULL,
-    satuan          VARCHAR(20)     NOT NULL,
-    harga           DECIMAL(10,2)   NOT NULL
+-- 8. Tabel PERAWAT_RAWAT_INAP  (Bridge: merawat N:N)
+CREATE TABLE perawat_rawat_inap (
+    id_perawat      VARCHAR(10)   NOT NULL,
+    id_rawat_inap   VARCHAR(10)   NOT NULL,
+    PRIMARY KEY (id_perawat, id_rawat_inap),
+    FOREIGN KEY (id_perawat)    REFERENCES perawat(id_perawat),
+    FOREIGN KEY (id_rawat_inap) REFERENCES rawat_inap(id_rawat_inap)
 );
 
--- 6. Tabel RESEP  (obat yang diberikan per episode rawat inap)
-CREATE TABLE resep (
-    id_resep        INT             AUTO_INCREMENT PRIMARY KEY,
-    id_rawat_inap   INT             NOT NULL,
-    id_obat         INT             NOT NULL,
-    jumlah          INT             NOT NULL,
-    keterangan      VARCHAR(255),
-    FOREIGN KEY (id_rawat_inap) REFERENCES rawat_inap(id_rawat_inap),
-    FOREIGN KEY (id_obat)       REFERENCES obat(id_obat)
+-- 9. Tabel RESEP_OBAT
+CREATE TABLE resep_obat (
+    id_resep        VARCHAR(10)   PRIMARY KEY,
+    id_dokter       VARCHAR(10)   NOT NULL,
+    id_apoteker     VARCHAR(10)   NOT NULL,
+    id_rawat_inap   VARCHAR(10)   NOT NULL,
+    tanggal_resep   DATE          NOT NULL,
+    keterangan      TEXT,
+    FOREIGN KEY (id_dokter)     REFERENCES dokter(id_dokter),
+    FOREIGN KEY (id_apoteker)    REFERENCES apoteker(id_apoteker),
+    FOREIGN KEY (id_rawat_inap) REFERENCES rawat_inap(id_rawat_inap)
+);
+
+-- 10. Tabel DETAIL_RESEP_OBAT  (Bridge: terdiri N:N)
+CREATE TABLE detail_resep_obat (
+    id_resep   VARCHAR(10) NOT NULL,
+    id_obat    VARCHAR(10) NOT NULL,
+    jumlah     INT         NOT NULL CHECK (jumlah > 0),
+    PRIMARY KEY (id_resep, id_obat),
+    FOREIGN KEY (id_resep) REFERENCES resep_obat(id_resep),
+    FOREIGN KEY (id_obat)  REFERENCES obat(id_obat)
 );
 
 
 -- ============================================================
---  DML — INSERT (Data Sample)
+-- [2] DML - INSERT DATA
 -- ============================================================
 
--- ─── PASIEN ───────────────────────────────────────────────
-INSERT INTO pasien (no_rm, nama_pasien, tanggal_lahir, jenis_kelamin, alamat, no_telepon) VALUES
-('RM001', 'Budi Santoso',   '1985-03-15', 'L', 'Jl. Merdeka No. 10, Bandung',      '081234567890'),
-('RM002', 'Siti Rahayu',    '1990-07-22', 'P', 'Jl. Sudirman No. 5, Bandung',       '082345678901'),
-('RM003', 'Ahmad Wijaya',   '1978-11-08', 'L', 'Jl. Diponegoro No. 3, Cimahi',      '083456789012'),
-('RM004', 'Dewi Kusuma',    '1995-02-14', 'P', 'Jl. Ahmad Yani No. 20, Bandung',    '084567890123'),
-('RM005', 'Riko Pratama',   '2000-09-30', 'L', 'Jl. Gatot Subroto No. 7, Cimahi',  '085678901234');
+-- Insert DOKTER
+INSERT INTO dokter VALUES
+    ('D001', 'Dr. Adrian', 35, 'Laki-Laki', '081298765432', 'Bedah Umum'),
+    ('D002', 'Dr. El', 40, 'Laki-Laki', '081123985467', 'Bedah Umum'),
+    ('D003', 'Dr. Mahali', 45, 'Laki-Laki', '081287641875', 'Bedah Umum');
 
--- ─── DOKTER ───────────────────────────────────────────────
-INSERT INTO dokter (nama_dokter, spesialisasi, no_telepon) VALUES
-('Dr. Andi Kurniawan',  'Penyakit Dalam',   '081111111111'),
-('Dr. Sari Dewi',       'Jantung',          '082222222222'),
-('Dr. Hendra Putra',    'Bedah',            '083333333333'),
-('Dr. Lina Wati',       'Anak',             '084444444444');
+-- Insert PASIEN
+INSERT INTO pasien VALUES
+    ('P001', 'Roland', 19, 'Laki-Laki', '081234567890', 'Jl. Maranatha No.1, Cimahi'),
+    ('P002', 'Michael', 20, 'Laki-Laki', '081234567891', 'Jl. Maranatha No.2, Cimahi'),
+    ('P003', 'Febrian', 20, 'Laki-Laki', '081234567891', 'Jl. Maranatha No.3, Cimahi');
+    
 
--- ─── KAMAR ────────────────────────────────────────────────
-INSERT INTO kamar (nomor_kamar, kelas, harga_per_hari, status) VALUES
-('VIP-01', 'VIP', 1500000.00, 'Terisi'),
-('VIP-02', 'VIP', 1500000.00, 'Tersedia'),
-('K1-01',  'I',    750000.00, 'Terisi'),
-('K1-02',  'I',    750000.00, 'Tersedia'),
-('K2-01',  'II',   400000.00, 'Terisi'),
-('K3-01',  'III',  200000.00, 'Tersedia');
+-- Insert PERAWAT
+INSERT INTO perawat VALUES
+    ('N001', 'Susanti',  27, 'Perempuan', '083111112222', 'Pagi'),
+    ('N002', 'Ros',  35, 'Perempuan', '083187124872', 'Siang'),
+    ('N003', 'Saleh', 30, 'Laki-Laki', '083133334444', 'Malam');
 
--- ─── OBAT ─────────────────────────────────────────────────
-INSERT INTO obat (nama_obat, satuan, harga) VALUES
-('Paracetamol 500mg',   'Tablet',  2500.00),
-('Amoxicillin 500mg',   'Kapsul',  5000.00),
-('Omeprazole 20mg',     'Kapsul',  8000.00),
-('Metformin 500mg',     'Tablet',  3000.00),
-('Vitamin C 1000mg',    'Tablet',  4000.00);
+-- Insert KAMAR
+INSERT INTO kamar VALUES
+    ('K001', '101', 'VIP', 2, 750000.00, 'Terisi'),
+	('K002', '201', 'Kelas2', 2, 250000.00, 'Kosong'),
+	('K003', '102', 'I', 1, 500000.00, 'Kosong');
+-- Insert APOTEKER
+INSERT INTO apoteker VALUES
+    ('A001', 'Steven', 28, 'Laki-Laki');
 
--- ─── RAWAT INAP ───────────────────────────────────────────
-INSERT INTO rawat_inap (id_pasien, id_dokter, id_kamar, tanggal_masuk, tanggal_keluar, diagnosis, status) VALUES
-(1, 1, 1, '2026-05-20', '2026-05-25', 'Demam Tifoid',                    'Selesai'),
-(2, 2, 3, '2026-05-28', NULL,         'Hipertensi',                       'Aktif'),
-(3, 3, 5, '2026-06-01', NULL,         'Appendisitis',                     'Aktif'),
-(4, 4, 1, '2026-05-15', '2026-05-20', 'Infeksi Saluran Pernapasan',      'Selesai'),
-(5, 1, 3, '2026-06-03', NULL,         'Diabetes Mellitus',                'Aktif');
+-- Insert OBAT
+INSERT INTO obat VALUES
+    ('OB001', 'Amoxicillin 500mg', 'Kapsul', 200, 8500.00),
+    ('OB002', 'Paracetamol 500mg', 'Tablet', 500, 3000.00),
+    ('OB006', 'Infus NaCl 0.9%',   'Botol',   80, 35000.00);
 
--- ─── RESEP ────────────────────────────────────────────────
-INSERT INTO resep (id_rawat_inap, id_obat, jumlah, keterangan) VALUES
-(1, 1, 20, '3x sehari sesudah makan'),
-(1, 2, 15, '3x sehari'),
-(2, 4, 30, '2x sehari sesudah makan'),
-(3, 1, 10, '3x sehari'),
-(3, 3, 10, '1x sehari sebelum makan'),
-(4, 5, 15, '1x sehari'),
-(5, 4, 30, '2x sehari sesudah makan'),
-(5, 5, 20, '1x sehari');
+-- Insert RAWAT_INAP
+INSERT INTO rawat_inap VALUES
+    ('RI001', 'P001', 'D001', 'K001', '2025-06-10', '2025-06-15', 'Appendisitis Akut', 'Selesai'),
+	('RI002', 'P002', 'D002', 'K002', '2025-06-12', NULL, 'Demam Berdarah', 'Aktif'),
+    ('RI003', 'P003', 'D003', 'K003', '2025-06-14', NULL, 'Tifus', 'Aktif');
+
+-- Insert PERAWAT_RAWAT_INAP
+INSERT INTO perawat_rawat_inap VALUES
+    ('N001', 'RI001'),
+    ('N002', 'RI001'),
+    ('N003', 'RI001');
+
+-- Insert RESEP_OBAT
+INSERT INTO resep_obat VALUES
+    ('R001', 'D001', 'A001', 'RI001', '2025-06-10', 'Diminum 3x sehari setelah makan');
+
+-- Insert DETAIL_RESEP_OBAT
+INSERT INTO detail_resep_obat VALUES
+    ('R001', 'OB001', 21),
+    ('R001', 'OB002', 15),
+    ('R001', 'OB006',  2);
+    
+UPDATE kamar SET status = 'Terisi' WHERE id_kamar IN ('K002', 'K003');
 
 
 -- ============================================================
---  DML — SELECT (Query Operasional)
+-- [3] QUERY SELECT - LAPORAN & MONITORING
 -- ============================================================
 
--- ─── Q1: Daftar semua pasien yang sedang aktif dirawat ────
+-- Q1: Daftar seluruh pasien rawat inap yang AKTIF
 SELECT
-    p.no_rm,
+    ri.id_rawat_inap,
     p.nama_pasien,
     d.nama_dokter,
     d.spesialisasi,
@@ -151,58 +196,85 @@ SELECT
     ri.diagnosis
 FROM rawat_inap ri
 JOIN pasien p ON ri.id_pasien = p.id_pasien
-JOIN dokter  d ON ri.id_dokter = d.id_dokter
-JOIN kamar   k ON ri.id_kamar  = k.id_kamar
+JOIN dokter d ON ri.id_dokter = d.id_dokter
+JOIN kamar  k ON ri.id_kamar  = k.id_kamar
 WHERE ri.status = 'Aktif'
 ORDER BY ri.tanggal_masuk;
 
--- ─── Q2: Estimasi total biaya kamar per pasien ────────────
---        (COALESCE agar pasien aktif dihitung sampai hari ini)
+-- Q2: Detail resep obat lengkap (resep + daftar obat + apoteker)
 SELECT
+    ro.id_resep,
+    ro.tanggal_resep,
     p.nama_pasien,
-    k.nomor_kamar,
-    k.kelas,
-    ri.tanggal_masuk,
-    COALESCE(ri.tanggal_keluar, CURDATE())                              AS tanggal_keluar,
-    DATEDIFF(COALESCE(ri.tanggal_keluar, CURDATE()), ri.tanggal_masuk) AS lama_hari,
-    k.harga_per_hari,
-    DATEDIFF(COALESCE(ri.tanggal_keluar, CURDATE()), ri.tanggal_masuk)
-        * k.harga_per_hari                                              AS total_biaya_kamar
-FROM rawat_inap ri
-JOIN pasien p ON ri.id_pasien = p.id_pasien
-JOIN kamar  k ON ri.id_kamar  = k.id_kamar
-ORDER BY total_biaya_kamar DESC;
-
--- ─── Q3: Detail resep tiap pasien beserta total harga obat ─
-SELECT
-    p.nama_pasien,
-    ri.diagnosis,
-    o.nama_obat,
-    r.jumlah,
-    o.satuan,
-    r.keterangan,
-    r.jumlah * o.harga AS total_harga_obat
-FROM resep r
-JOIN rawat_inap ri ON r.id_rawat_inap = ri.id_rawat_inap
-JOIN pasien     p  ON ri.id_pasien    = p.id_pasien
-JOIN obat       o  ON r.id_obat       = o.id_obat
-ORDER BY p.nama_pasien, o.nama_obat;
-
--- ─── Q4: Jumlah pasien yang ditangani tiap dokter ─────────
-SELECT
     d.nama_dokter,
-    d.spesialisasi,
-    COUNT(ri.id_rawat_inap) AS total_pasien
-FROM dokter d
-LEFT JOIN rawat_inap ri ON d.id_dokter = ri.id_dokter
-GROUP BY d.id_dokter, d.nama_dokter, d.spesialisasi
-ORDER BY total_pasien DESC;
+    ap.nama_apoteker,
+    o.nama_obat,
+    o.satuan,
+    dro.jumlah,
+    (dro.jumlah * o.harga) AS subtotal_obat,
+    ro.keterangan
+FROM resep_obat ro
+JOIN rawat_inap        ri  ON ro.id_rawat_inap = ri.id_rawat_inap
+JOIN pasien            p   ON ri.id_pasien     = p.id_pasien
+JOIN dokter            d   ON ro.id_dokter     = d.id_dokter
+JOIN apoteker          ap  ON ro.id_apoteker   = ap.id_apoteker
+JOIN detail_resep_obat dro ON ro.id_resep      = dro.id_resep
+JOIN obat              o   ON dro.id_obat      = o.id_obat
+ORDER BY ro.id_resep, o.nama_obat;
 
--- ─── Q5: Kamar yang masih tersedia ───────────────────────
+-- Q3: Monitoring tarif kamar per hari pasien rawat inap
 SELECT
-    nomor_kamar,
-    kelas,
-    FORMAT(harga_per_hari, 0) AS harga_per_hari
-FROM kamar
-WHERE status = 'Tersedia'
-ORDER BY kelas, nomor_kamar;
+    p.nama_pasien,
+    ri.id_rawat_inap,
+    k.harga_per_hari
+FROM rawat_inap ri
+JOIN pasien               p   ON ri.id_pasien   = p.id_pasien
+JOIN kamar                k   ON ri.id_kamar    = k.id_kamar
+LEFT JOIN resep_obat        ro  ON ri.id_rawat_inap = ro.id_rawat_inap
+LEFT JOIN detail_resep_obat dro ON ro.id_resep  = dro.id_resep
+LEFT JOIN obat              o   ON dro.id_obat    = o.id_obat
+GROUP BY p.nama_pasien, ri.id_rawat_inap, k.harga_per_hari;
+
+-- Q4: Perawat yang bertugas per pasien rawat inap
+SELECT
+    ri.id_rawat_inap,
+    p.nama_pasien,
+    GROUP_CONCAT(pw.nama_perawat
+               ORDER BY pw.nama_perawat SEPARATOR ', ') AS daftar_perawat,
+    GROUP_CONCAT(pw.shift
+               ORDER BY pw.nama_perawat SEPARATOR ', ') AS shift_perawat
+FROM rawat_inap ri
+JOIN pasien             p   ON ri.id_pasien    = p.id_pasien
+JOIN perawat_rawat_inap pri ON ri.id_rawat_inap = pri.id_rawat_inap
+JOIN perawat            pw  ON pri.id_perawat  = pw.id_perawat
+GROUP BY ri.id_rawat_inap;
+
+
+-- ============================================================
+-- [4] DML - UPDATE & DELETE
+-- ============================================================
+
+-- U1: Update status kamar setelah pasien keluar
+UPDATE kamar
+SET    status = 'Kosong'
+WHERE  id_kamar NOT IN (
+    SELECT DISTINCT id_kamar
+    FROM   rawat_inap
+    WHERE  status = 'Aktif'
+);
+
+-- U2: Catat tanggal keluar & ubah status Roland menjadi Selesai
+UPDATE rawat_inap
+SET    tanggal_keluar = '2025-06-15',
+       status         = 'Selesai'
+WHERE  id_rawat_inap  = 'RI001';
+
+-- U3: Kurangi stok obat setelah resep diproses
+UPDATE obat
+       SET stok = stok - 21
+WHERE  id_obat = 'OB001';
+
+-- D1: Hapus satu jenis obat dari resep Roland
+DELETE FROM detail_resep_obat
+WHERE  id_resep = 'R001'
+  AND  id_obat  = 'OB002';
